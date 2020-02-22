@@ -8,5 +8,5 @@ type DetailedTokenInterface interface {
 
 	GetSymbol(stub shim.ChaincodeStubInterface) (string, error)
 
-	GetDecimals(stub shim.ChaincodeStubInterface) (float64, error)
+	GetDecimals(stub shim.ChaincodeStubInterface) (string, error)
 }

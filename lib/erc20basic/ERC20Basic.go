@@ -4,6 +4,7 @@ import (
 	. "erc20/helpers"
 	"erc20/lib/erc20events"
 	"fmt"
+	"math/big"
 
 	"github.com/hyperledger/fabric/core/chaincode/shim"
 )
@@ -16,16 +17,17 @@ type Token struct{}
 /*GetBalanceOf sender by ID.
 
 * `args[0]` - the ID of user.*/
-func (t *Token) GetBalanceOf(stub shim.ChaincodeStubInterface, args []string) (float64, error) {
+func (t *Token) GetBalanceOf(stub shim.ChaincodeStubInterface, args []string) (*big.Int, error) {
 	tokenBalance, err := stub.GetState(args[0])
 	logger.Infof("GetBalanceOf: getting balance of %v...", args[0])
-	return BufferToFloat(DefaultToZeroIfEmpty(tokenBalance)), err
+	return BufferToBigInt(DefaultToZeroIfEmpty(tokenBalance)), err
 }
 
 /*GetTotalSupply returns total number of tokens in existence*/
-func (t *Token) GetTotalSupply(stub shim.ChaincodeStubInterface) (float64, error) {
+func (t *Token) GetTotalSupply(stub shim.ChaincodeStubInterface) (*big.Int, error) {
 	totalSupply, err := stub.GetState("totalSupply")
-	return BufferToFloat(DefaultToZeroIfEmpty(totalSupply)), err
+	logger.Infof("GetTotalSupply: %v", totalSupply)
+	return BufferToBigInt(DefaultToZeroIfEmpty(totalSupply)), err
 }
 
 /*GetAllowance checks the amount of tokens that an owner allowed a spender to transfer in behalf of the owner to another receiver.
@@ -33,12 +35,12 @@ func (t *Token) GetTotalSupply(stub shim.ChaincodeStubInterface) (float64, error
 * `args[0]` - the ID of owner.
 
 * `args[1]` - the ID of spender*/
-func (t *Token) GetAllowance(stub shim.ChaincodeStubInterface, args []string) (float64, error) {
+func (t *Token) GetAllowance(stub shim.ChaincodeStubInterface, args []string) (*big.Int, error) {
 	ownerID, spenderID := args[0], args[1]
 
 	allowance, err := stub.GetState(ownerID + "-" + spenderID)
 
-	return BufferToFloat(DefaultToZeroIfEmpty(allowance)), err
+	return BufferToBigInt(DefaultToZeroIfEmpty(allowance)), err
 }
 
 /*Transfer token from current caller to a specified address.
@@ -48,7 +50,7 @@ func (t *Token) GetAllowance(stub shim.ChaincodeStubInterface, args []string) (f
 * `args[1]` - the transfer amount.
 
 * `getBalanceOf` - specifies the function of getting the initial balances of token sender & receiver.*/
-func (t *Token) Transfer(stub shim.ChaincodeStubInterface, args []string, getBalanceOf func(shim.ChaincodeStubInterface, []string) (float64, error)) error {
+func (t *Token) Transfer(stub shim.ChaincodeStubInterface, args []string, getBalanceOf func(shim.ChaincodeStubInterface, []string) (*big.Int, error)) error {
 	receiverID, sValue := args[0], args[1]
 
 	senderID, err := GetCallerID(stub)
@@ -60,7 +62,7 @@ func (t *Token) Transfer(stub shim.ChaincodeStubInterface, args []string, getBal
 		return err
 	}
 
-	transferAmount := StringToFloat(sValue)
+	transferAmount := StringToBigInt(sValue)
 
 	logger.Infof("Tranfer: transferring %v tokens from %v to %v...", transferAmount, senderID, receiverID)
 
@@ -83,11 +85,11 @@ func (t *Token) Transfer(stub shim.ChaincodeStubInterface, args []string, getBal
 		return fmt.Errorf("transfer amount should be less than balance of sender (%v): %v", senderID, err)
 	}
 
-	err = stub.PutState(senderID, FloatToBuffer(balanceOfSender-transferAmount))
+	err = stub.PutState(senderID, []byte(Sub(balanceOfSender, transferAmount).String()))
 	if err != nil {
 		return err
 	}
-	err = stub.PutState(receiverID, FloatToBuffer(balanceOfReceiver+transferAmount))
+	err = stub.PutState(receiverID, []byte(Add(balanceOfReceiver, transferAmount).String()))
 	if err != nil {
 		return err
 	}
@@ -109,8 +111,8 @@ func (t *Token) Transfer(stub shim.ChaincodeStubInterface, args []string, getBal
 * `getAllowance` - defines the function of getting the allowance that the current chaincode invoker can spend from the token owner, to transfer to the receiver.*/
 func (t *Token) TransferFrom(stub shim.ChaincodeStubInterface,
 	args []string,
-	getBalanceOf func(shim.ChaincodeStubInterface, []string) (float64, error),
-	getAllowance func(shim.ChaincodeStubInterface, []string) (float64, error),
+	getBalanceOf func(shim.ChaincodeStubInterface, []string) (*big.Int, error),
+	getAllowance func(shim.ChaincodeStubInterface, []string) (*big.Int, error),
 ) error {
 	tokenOwnerID, receiverID, sValue := args[0], args[1], args[2]
 
@@ -123,7 +125,7 @@ func (t *Token) TransferFrom(stub shim.ChaincodeStubInterface,
 		return err
 	}
 
-	transferAmount := StringToFloat(sValue)
+	transferAmount := StringToBigInt(sValue)
 
 	logger.Infof("TranferFrom: transferring %v tokens from %v to %v with %v...", transferAmount, tokenOwnerID, receiverID, spenderID)
 
@@ -156,15 +158,15 @@ func (t *Token) TransferFrom(stub shim.ChaincodeStubInterface,
 		return fmt.Errorf("transfer amount should be less than approved spending amount of %v: %v", spenderID, err)
 	}
 
-	err = stub.PutState(tokenOwnerID, FloatToBuffer(balanceOfTokenOwner-transferAmount))
+	err = stub.PutState(tokenOwnerID, []byte(Sub(balanceOfTokenOwner, transferAmount).String()))
 	if err != nil {
 		return err
 	}
-	err = stub.PutState(tokenOwnerID+"-"+spenderID, FloatToBuffer(approvedAmount-transferAmount))
+	err = stub.PutState(tokenOwnerID+"-"+spenderID, []byte(Sub(approvedAmount, transferAmount).String()))
 	if err != nil {
 		return err
 	}
-	err = stub.PutState(receiverID, FloatToBuffer(balanceOfReceiver+transferAmount))
+	err = stub.PutState(receiverID, []byte(Add(balanceOfReceiver, transferAmount).String()))
 	if err != nil {
 		return err
 	}
@@ -195,7 +197,7 @@ func (t *Token) UpdateApproval(stub shim.ChaincodeStubInterface, args []string) 
 		return err
 	}
 
-	approvedAmount := StringToFloat(newAllowance)
+	approvedAmount := StringToBigInt(newAllowance)
 	json := MalshalJSON(erc20events.Event{Origin: callerID, Payload: erc20events.Payload{From: callerID, To: spenderID, Amount: approvedAmount}})
 	return stub.SetEvent(erc20events.APPROVAL, json)
 }

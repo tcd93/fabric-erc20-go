@@ -2,6 +2,7 @@ package helpers
 
 import (
 	"encoding/json"
+	"math/big"
 	"strconv"
 )
 
@@ -13,41 +14,57 @@ func DefaultToZeroIfEmpty(value []byte) []byte {
 	return value
 }
 
-/*BufferToFloat convert array of bytes to float64*/
-func BufferToFloat(buffer []byte) float64 {
-	value, err := strconv.ParseFloat(string(buffer), 64)
-	if err != nil {
-		panic(err)
+/*BufferToBigInt convert array of bytes to big.Int*/
+func BufferToBigInt(buffer []byte) *big.Int {
+	n := &big.Int{}
+	v, ok := n.SetString(string(buffer), 10)
+	if !ok {
+		panic("BufferToBigInt conversion failed")
 	}
-	return value
+	return v
 }
 
-/*StringToInt converts type string to type int*/
-func StringToInt(str string) int {
-	n, err := strconv.Atoi(str)
+/*StringToInt converts type string to type int64*/
+func StringToInt(str string) int64 {
+	n, err := strconv.ParseInt(str, 10, 64)
 	if err != nil {
 		panic(err.Error())
 	}
 	return n
 }
 
-/*StringToFloat converts type string to type float64*/
-func StringToFloat(str string) float64 {
-	f, err := strconv.ParseFloat(str, 64)
-	if err != nil {
-		panic(err.Error())
+/*StringToBigInt converts type string to type big.Int*/
+func StringToBigInt(str string) *big.Int {
+	n := &big.Int{}
+	value, success := n.SetString(str, 10)
+	if !success {
+		panic("StringToBigInt conversion failed")
 	}
-	return f
+	return value
 }
 
-/*FloatToString converts a float64 number to string*/
-func FloatToString(value float64) string {
-	return strconv.FormatFloat(value, 'f', -1, 64)
+/*Add two big Int numbers*/
+func Add(a *big.Int, b *big.Int) *big.Int {
+	n := &big.Int{}
+	return n.Add(a, b)
 }
 
-/*FloatToBuffer converts a float64 number to array of bytes*/
-func FloatToBuffer(value float64) []byte {
-	return []byte(FloatToString(value))
+/*Sub two big Int numbers*/
+func Sub(a *big.Int, b *big.Int) *big.Int {
+	n := &big.Int{}
+	return n.Sub(a, b)
+}
+
+/*Mul two big Int numbers*/
+func Mul(a *big.Int, b *big.Int) *big.Int {
+	n := &big.Int{}
+	return n.Mul(a, b)
+}
+
+/*Pow returns the a raised to the power of b in big Int type*/
+func Pow(a int64, b int64) *big.Int {
+	n := &big.Int{}
+	return n.Exp(big.NewInt(a), big.NewInt(b), nil)
 }
 
 /*MalshalJSON returns the JSON encoding of `payload`*/

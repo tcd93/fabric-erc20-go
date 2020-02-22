@@ -3,9 +3,12 @@ package erc20mintable
 import (
 	. "erc20/helpers"
 	"erc20/lib/erc20events"
+	"math/big"
 
 	"github.com/hyperledger/fabric/core/chaincode/shim"
 )
+
+var logger = shim.NewLogger("init-logger")
 
 /*Token mintable implements MintableTokenInterface*/
 type Token struct{}
@@ -24,15 +27,17 @@ type Token struct{}
 func (t *Token) Mint(stub shim.ChaincodeStubInterface,
 	args []string,
 	getOwner func(shim.ChaincodeStubInterface) (string, error),
-	getBalanceOf func(shim.ChaincodeStubInterface, []string) (float64, error),
-	getTotalSupply func(shim.ChaincodeStubInterface) (float64, error),
+	getBalanceOf func(shim.ChaincodeStubInterface, []string) (*big.Int, error),
+	getTotalSupply func(shim.ChaincodeStubInterface) (*big.Int, error),
 ) error {
 	minterID, value := args[0], args[1]
+
+	logger.Infof("Minting %v tokens for minter %v", value, minterID)
 
 	if err := CheckGreaterThanZero(value); err != nil {
 		return err
 	}
-	transferAmount := StringToFloat(value)
+	transferAmount := StringToBigInt(value)
 
 	callerID, err := GetCallerID(stub)
 	if err != nil {
@@ -64,11 +69,11 @@ func (t *Token) Mint(stub shim.ChaincodeStubInterface,
 		return err
 	}
 
-	err = stub.PutState("totalSupply", FloatToBuffer(totalSupplyAmount+transferAmount))
+	err = stub.PutState("totalSupply", []byte(Add(totalSupplyAmount, transferAmount).String()))
 	if err != nil {
 		return err
 	}
-	err = stub.PutState(minterID, FloatToBuffer(balanceMinter+transferAmount))
+	err = stub.PutState(minterID, []byte(Add(balanceMinter, transferAmount).String()))
 	if err != nil {
 		return err
 	}

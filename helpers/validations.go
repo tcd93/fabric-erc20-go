@@ -2,6 +2,7 @@ package helpers
 
 import (
 	"fmt"
+	"math/big"
 	"strconv"
 )
 
@@ -23,32 +24,32 @@ func CheckGreaterThanZero(value string) error {
 }
 
 /*CheckBalance checks if sender's balance is > 0*/
-func CheckBalance(balance float64, mspID string) error {
-	if balance < 0 {
+func CheckBalance(balance *big.Int, mspID string) error {
+	if balance.Cmp(big.NewInt(0)) == -1 {
 		return fmt.Errorf("Balance of sender %v is %v", mspID, balance)
 	}
 	return nil
 }
 
 /*CheckTotalSupply checks if totalSupplyAmount is valid*/
-func CheckTotalSupply(amount float64) error {
-	if amount < 0 {
+func CheckTotalSupply(amount *big.Int) error {
+	if amount.Cmp(big.NewInt(0)) == -1 {
 		return fmt.Errorf("Total supply is < 0")
 	}
 	return nil
 }
 
 /*IsSmallerOrEqual returns `nil` if a is <= b*/
-func IsSmallerOrEqual(a float64, b float64) error {
-	if a > b {
+func IsSmallerOrEqual(a *big.Int, b *big.Int) error {
+	if a.Cmp(b) == 1 {
 		return fmt.Errorf("%v should be <= to %v", a, b)
 	}
 	return nil
 }
 
 /*CheckApproved checks if approved amount is > 0*/
-func CheckApproved(approved float64, key string) error {
-	if approved <= 0 {
+func CheckApproved(approved *big.Int, key string) error {
+	if approved.Cmp(big.NewInt(0)) == -1 {
 		return fmt.Errorf("Approved amount for %v is %v", key, approved)
 	}
 	return nil

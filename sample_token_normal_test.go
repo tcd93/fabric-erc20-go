@@ -10,7 +10,7 @@ import (
 	"erc20/lib/erc20pausable"
 	. "erc20/testutils"
 	"fmt"
-	"math"
+	"math/big"
 
 	"github.com/hyperledger/fabric/core/chaincode/shim"
 	. "github.com/onsi/ginkgo"
@@ -19,11 +19,10 @@ import (
 
 var _ = Describe("token - normal cert without attrs", func() {
 	const (
-		txID             = `test-transaction-id`
-		tokenName        = `sample token name`
-		tokenSymbol      = `(y)(y)`
-		tokenTotalSupply = `1000000`
-		tokenDecimals    = `2`
+		txID          = `test-transaction-id`
+		tokenName     = `sample token name`
+		tokenSymbol   = `(y)(y)`
+		tokenDecimals = `14`
 
 		//attributes matches the certs in /testutils
 		issuer      = `Org1-child1`
@@ -49,7 +48,7 @@ var _ = Describe("token - normal cert without attrs", func() {
 
 	var err error
 	var mockStub *shim.MockStub = shim.NewMockStub("mockStubNormal", &sampleToken)
-	var initialTotalSupply float64 = InitialMintAmount * math.Pow10(StringToInt(tokenDecimals))
+	var initialTotalSupply *big.Int = Mul(big.NewInt(InitialMintAmount), Pow(10, StringToInt(tokenDecimals)))
 
 	ownerID := ownerOrg + "," + ownerIssuer + "," + ownerSubject
 	fromID := fromOrg + "," + issuer + "," + fromSubject
@@ -110,8 +109,7 @@ var _ = Describe("token - normal cert without attrs", func() {
 		It("Allow everyone to get token decimals", func() {
 			decimals, err := sampleToken.GetDecimals(mockStub)
 			Expect(err).To(BeNil())
-			s := StringToFloat(tokenDecimals)
-			Expect(decimals).To(Equal(s))
+			Expect(decimals).To(Equal(tokenDecimals))
 		})
 	})
 
@@ -135,22 +133,22 @@ var _ = Describe("token - normal cert without attrs", func() {
 			})
 
 			It("Transfer tokens between clients using Transfer", func() {
-				transferAmount := 2.5
-				initialBalance := 5.0
+				transferAmount := big.NewInt(2)
+				initialBalance := big.NewInt(5)
 
 				err = sampleToken.Transfer(mockStub,
-					[]string{toID, FloatToString(transferAmount)},
+					[]string{toID, transferAmount.String()},
 					WithBalanceOf(initialBalance),
 				)
 				Expect(err).To(BeNil())
 
 				balance, err := sampleToken.GetBalanceOf(mockStub, []string{fromID})
 				Expect(err).To(BeNil())
-				Expect(balance).To(Equal(initialBalance - transferAmount))
+				Expect(balance).To(Equal(Sub(initialBalance, transferAmount)))
 
 				balance, err = sampleToken.GetBalanceOf(mockStub, []string{toID})
 				Expect(err).To(BeNil())
-				Expect(balance).To(Equal(initialBalance + transferAmount))
+				Expect(balance).To(Equal(Add(initialBalance, transferAmount)))
 			})
 		})
 
@@ -173,12 +171,12 @@ var _ = Describe("token - normal cert without attrs", func() {
 			})
 
 			It("Transfer tokens between clients using TransferFrom", func() {
-				transferAmount := 30.00
-				initialBalance := 50.00
-				allowance := 40.00
+				transferAmount := big.NewInt(30)
+				initialBalance := big.NewInt(50)
+				allowance := big.NewInt(40)
 
 				err := sampleToken.TransferFrom(mockStub,
-					[]string{fromID, toID, FloatToString(transferAmount)},
+					[]string{fromID, toID, transferAmount.String()},
 					WithBalanceOf(initialBalance),
 					WithAllowanceOf(allowance),
 				)
@@ -186,24 +184,24 @@ var _ = Describe("token - normal cert without attrs", func() {
 
 				balance, err := sampleToken.GetBalanceOf(mockStub, []string{fromID})
 				Expect(err).To(BeNil())
-				Expect(balance).To(Equal(initialBalance - transferAmount))
+				Expect(balance).To(Equal(Sub(initialBalance, transferAmount)))
 
 				balance, err = sampleToken.GetBalanceOf(mockStub, []string{toID})
 				Expect(err).To(BeNil())
-				Expect(balance).To(Equal(initialBalance + transferAmount))
+				Expect(balance).To(Equal(Add(initialBalance, transferAmount)))
 			})
 
 			It("Should fails when transfer more tokens than allowed", func() {
 				//this transaction should not be OK, as `allowance` > `transferAmount`
-				transferAmount := 60.00
-				initialBalance := 100.00
-				allowance := 40.00
+				transferAmount := big.NewInt(60)
+				initialBalance := big.NewInt(100)
+				allowance := big.NewInt(40)
 
 				initialBalanceMockFunc := WithBalanceOf(initialBalance)
 				allowanceMockFunc := WithAllowanceOf(allowance)
 
 				err := sampleToken.TransferFrom(mockStub,
-					[]string{fromID, toID, FloatToString(transferAmount)},
+					[]string{fromID, toID, transferAmount.String()},
 					initialBalanceMockFunc,
 					allowanceMockFunc,
 				)
@@ -212,15 +210,15 @@ var _ = Describe("token - normal cert without attrs", func() {
 
 			It("Should fails when transfer tokens with empty balance", func() {
 				//this transaction should not be OK, as `transferAmount` > `initialBalance`
-				transferAmount := 60.00
-				initialBalance := 00.00
-				allowance := 100.00
+				transferAmount := big.NewInt(60)
+				initialBalance := big.NewInt(0)
+				allowance := big.NewInt(100)
 
 				initialBalanceMockFunc := WithBalanceOf(initialBalance)
 				allowanceMockFunc := WithAllowanceOf(allowance)
 
 				err := sampleToken.TransferFrom(mockStub,
-					[]string{fromID, toID, FloatToString(transferAmount)},
+					[]string{fromID, toID, transferAmount.String()},
 					initialBalanceMockFunc,
 					allowanceMockFunc,
 				)
@@ -231,7 +229,7 @@ var _ = Describe("token - normal cert without attrs", func() {
 
 	Describe("Integrated Token transfer functionalities...", func() {
 		It("Transfer tokens from owner to client", func() {
-			transferAmount := 110.00
+			transferAmount := big.NewInt(110)
 
 			initialBalanceOfClient, err := sampleToken.GetBalanceOf(mockStub, []string{toID})
 			// Expect(initialBalanceOfClient).To(Equal(80.00))
@@ -240,28 +238,28 @@ var _ = Describe("token - normal cert without attrs", func() {
 			Expect(err).To(BeNil())
 
 			err = sampleToken.Transfer(mockStub,
-				[]string{toID, FloatToString(transferAmount)},
+				[]string{toID, transferAmount.String()},
 				sampleToken.GetBalanceOf,
 			)
 			Expect(err).To(BeNil())
 
 			balance, err := sampleToken.GetBalanceOf(mockStub, []string{toID})
 			Expect(err).To(BeNil())
-			Expect(balance).To(Equal(initialBalanceOfClient + transferAmount))
+			Expect(balance).To(Equal(Add(initialBalanceOfClient, transferAmount)))
 
 			balance, err = sampleToken.GetBalanceOf(mockStub, []string{ownerID})
 			Expect(err).To(BeNil())
-			Expect(balance).To(Equal(initialBalanceOfOwner - transferAmount))
+			Expect(balance).To(Equal(Sub(initialBalanceOfOwner, transferAmount)))
 		})
 
 		Describe("Transfer tokens with Comment", func() {
 			comment := "Transfer 10 token"
 
 			It("Should transfer with memo attached", func() {
-				transferAmount := 10.00
+				transferAmount := big.NewInt(10)
 
 				err = sampleToken.Transfer(mockStub,
-					[]string{toID, FloatToString(transferAmount), comment},
+					[]string{toID, transferAmount.String(), comment},
 					sampleToken.GetBalanceOf,
 				)
 				Expect(err).To(BeNil())
@@ -284,7 +282,7 @@ var _ = Describe("token - normal cert without attrs", func() {
 	Describe("Integrated Token burn functionalities...", func() {
 		Describe("Burn some tokens of owner by owner itself", func() {
 			It("Should burn successfully", func() {
-				burnAmount := 50.00
+				burnAmount := big.NewInt(50)
 
 				initialBalanceOfOwner, err := sampleToken.GetBalanceOf(mockStub, []string{ownerID})
 				Expect(err).To(BeNil())
@@ -292,7 +290,7 @@ var _ = Describe("token - normal cert without attrs", func() {
 				Expect(err).To(BeNil())
 
 				err = sampleToken.Burn(mockStub,
-					[]string{FloatToString(burnAmount)},
+					[]string{burnAmount.String()},
 					sampleToken.GetTotalSupply,
 					sampleToken.GetBalanceOf,
 				)
@@ -300,21 +298,21 @@ var _ = Describe("token - normal cert without attrs", func() {
 
 				balance, err := sampleToken.GetBalanceOf(mockStub, []string{ownerID})
 				Expect(err).To(BeNil())
-				Expect(balance).To(Equal(initialBalanceOfOwner - burnAmount))
+				Expect(balance).To(Equal(Sub(initialBalanceOfOwner, burnAmount)))
 
 				currentTotalSupply, err := sampleToken.GetTotalSupply(mockStub)
 				Expect(err).To(BeNil())
-				Expect(currentTotalSupply).To(Equal(initialTotalSupply - burnAmount))
+				Expect(currentTotalSupply).To(Equal(Sub(initialTotalSupply, burnAmount)))
 			})
 		})
 
 		Describe("Burning some tokens of client by owner", func() {
 			When("Allowance of owner is not updated", func() {
 				It("Should fail", func() {
-					burnAmount := 75.00
+					burnAmount := big.NewInt(75)
 
 					err = sampleToken.BurnFrom(mockStub,
-						[]string{fromID, FloatToString(burnAmount)},
+						[]string{fromID, burnAmount.String()},
 						sampleToken.GetAllowance,
 						sampleToken.GetTotalSupply,
 						sampleToken.GetBalanceOf,
@@ -337,8 +335,8 @@ var _ = Describe("token - normal cert without attrs", func() {
 					})
 
 					It("Update allowance of owner by `toID`", func() {
-						allowanceOfOwner := 100.00
-						err := sampleToken.UpdateApproval(mockStub, []string{ownerID, FloatToString(allowanceOfOwner)})
+						allowanceOfOwner := big.NewInt(100)
+						err := sampleToken.UpdateApproval(mockStub, []string{ownerID, allowanceOfOwner.String()})
 						Expect(err).To(BeNil())
 					})
 				})
@@ -356,7 +354,7 @@ var _ = Describe("token - normal cert without attrs", func() {
 					})
 
 					It("Should now be able to burn tokens of `toID` by owner", func() {
-						burnAmount := 75.00
+						burnAmount := big.NewInt(75)
 
 						initialBalanceOfBurnee, err := sampleToken.GetBalanceOf(mockStub, []string{toID})
 						Expect(err).To(BeNil())
@@ -364,7 +362,7 @@ var _ = Describe("token - normal cert without attrs", func() {
 						Expect(err).To(BeNil())
 
 						err = sampleToken.BurnFrom(mockStub,
-							[]string{toID, FloatToString(burnAmount)},
+							[]string{toID, burnAmount.String()},
 							sampleToken.GetAllowance,
 							sampleToken.GetTotalSupply,
 							sampleToken.GetBalanceOf,
@@ -373,19 +371,19 @@ var _ = Describe("token - normal cert without attrs", func() {
 
 						balance, err := sampleToken.GetBalanceOf(mockStub, []string{toID})
 						Expect(err).To(BeNil())
-						Expect(balance).To(Equal(initialBalanceOfBurnee - burnAmount))
+						Expect(balance).To(Equal(Sub(initialBalanceOfBurnee, burnAmount)))
 
 						currentTotalSupply, err := sampleToken.GetTotalSupply(mockStub)
 						Expect(err).To(BeNil())
-						Expect(currentTotalSupply).To(Equal(initialTotalSupply - burnAmount))
+						Expect(currentTotalSupply).To(Equal(Sub(initialTotalSupply, burnAmount)))
 					})
 
 					When("Burn again", func() {
 						It("Should fail as `toID` has no more balance", func() {
-							burnAmount := 125.01
+							burnAmount := big.NewInt(126)
 
 							err = sampleToken.BurnFrom(mockStub,
-								[]string{toID, FloatToString(burnAmount)},
+								[]string{toID, burnAmount.String()},
 								sampleToken.GetAllowance,
 								sampleToken.GetTotalSupply,
 								sampleToken.GetBalanceOf,
@@ -406,8 +404,8 @@ var _ = Describe("token - normal cert without attrs", func() {
 
 		When("Token is paused", func() {
 			It("Should not be able to transfer tokens", func() {
-				transferAmount := 30.00
-				Expect(mockStub.MockInvoke(txID, [][]byte{[]byte("Transfer"), []byte(toID), FloatToBuffer(transferAmount)}).Message).NotTo(BeEmpty())
+				transferAmount := big.NewInt(30)
+				Expect(mockStub.MockInvoke(txID, [][]byte{[]byte("Transfer"), []byte(toID), []byte(transferAmount.String())}).Message).NotTo(BeEmpty())
 			})
 		})
 
@@ -418,14 +416,14 @@ var _ = Describe("token - normal cert without attrs", func() {
 
 		When("Token is unpaused", func() {
 			It("Should now be able to transfer tokens", func() {
-				transferAmount := 30.00
+				transferAmount := big.NewInt(30)
 				initialBalanceOfClient, err := sampleToken.GetBalanceOf(mockStub, []string{toID})
 
-				Expect(mockStub.MockInvoke(txID, [][]byte{[]byte("Transfer"), []byte(toID), FloatToBuffer(transferAmount)}).Message).To(BeEmpty())
+				Expect(mockStub.MockInvoke(txID, [][]byte{[]byte("Transfer"), []byte(toID), []byte(transferAmount.String())}).Message).To(BeEmpty())
 
 				balance, err := sampleToken.GetBalanceOf(mockStub, []string{toID})
 				Expect(err).To(BeNil())
-				Expect(balance).To(Equal(initialBalanceOfClient + transferAmount)) //125 + 30 = 155
+				Expect(balance).To(Equal(Add(initialBalanceOfClient, transferAmount))) //125 + 30 = 155
 			})
 		})
 	})

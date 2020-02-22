@@ -1,8 +1,6 @@
 package erc20detailed
 
 import (
-	. "erc20/helpers"
-
 	"github.com/hyperledger/fabric/core/chaincode/shim"
 )
 
@@ -26,7 +24,7 @@ func (t *Token) GetSymbol(stub shim.ChaincodeStubInterface) (string, error) {
 The decimals are only for visualization purposes.
 All the operations are done using the smallest and indivisible token unit,
 just as on Ethereum all the operations are done in wei.*/
-func (t *Token) GetDecimals(stub shim.ChaincodeStubInterface) (float64, error) {
+func (t *Token) GetDecimals(stub shim.ChaincodeStubInterface) (string, error) {
 	tokenDecimalsBytes, err := stub.GetState("decimals")
-	return BufferToFloat(DefaultToZeroIfEmpty(tokenDecimalsBytes)), err
+	return string(tokenDecimalsBytes), err
 }

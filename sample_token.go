@@ -9,7 +9,7 @@ import (
 	"erc20/lib/erc20ownable"
 	"erc20/lib/erc20pausable"
 	"fmt"
-	"math"
+	"math/big"
 	"strings"
 
 	"github.com/hyperledger/fabric/core/chaincode/shim"
@@ -17,7 +17,7 @@ import (
 )
 
 //InitialMintAmount * 10^(token decimals) is the initial `total supply` of tokens
-const InitialMintAmount float64 = 1000000000
+const InitialMintAmount int64 = 1000000000
 
 var logger = shim.NewLogger("token-logger")
 
@@ -99,12 +99,19 @@ func (t *SampleToken) Init(stub shim.ChaincodeStubInterface) peer.Response {
 		if err != nil {
 			return shim.Error(err.Error())
 		}
+
 		//mint the initial total supply
 		//https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/examples/SimpleToken.sol
+		//activate the owner account first
+		err = t.Activate(stub, []string{callerID}, t.GetBalanceOf)
+		if err != nil {
+			return shim.Error(err.Error())
+		}
+
 		err = t.Mint(stub,
-			[]string{callerID, FloatToString(InitialMintAmount * math.Pow10(n))},
+			[]string{callerID, Mul(big.NewInt(InitialMintAmount), Pow(10, n)).String()},
 			withOwnerIs(callerID),
-			t.GetBalanceOf,
+			withInitialBalanceOf(0),
 			t.GetTotalSupply,
 		)
 		if err != nil {
@@ -113,6 +120,14 @@ func (t *SampleToken) Init(stub shim.ChaincodeStubInterface) peer.Response {
 	}
 
 	return shim.Success(nil)
+}
+
+//bypass the instance's own GetBalanceOf method to avoid "user is not registered" error as the caller is not
+//activated during first initialization phase (uncommitted transaction)
+func withInitialBalanceOf(initialBalance int64) func(stub shim.ChaincodeStubInterface, args []string) (*big.Int, error) {
+	return func(stub shim.ChaincodeStubInterface, args []string) (*big.Int, error) {
+		return big.NewInt(initialBalance), nil
+	}
 }
 
 func withOwnerIs(owner string) func(shim.ChaincodeStubInterface) (string, error) {
@@ -143,19 +158,19 @@ func (t *SampleToken) Invoke(stub shim.ChaincodeStubInterface) peer.Response {
 		if err != nil {
 			return shim.Error(err.Error())
 		}
-		return shim.Success(FloatToBuffer(f))
+		return shim.Success([]byte(f.String()))
 	case "GetTotalSupply":
 		f, err := t.GetTotalSupply(stub)
 		if err != nil {
 			return shim.Error(err.Error())
 		}
-		return shim.Success(FloatToBuffer(f))
+		return shim.Success([]byte(f.String()))
 	case "GetAllowance":
 		f, err := t.GetAllowance(stub, params)
 		if err != nil {
 			return shim.Error(err.Error())
 		}
-		return shim.Success(FloatToBuffer(f))
+		return shim.Success([]byte(f.String()))
 	case "GetOwner":
 		s, err := t.GetOwner(stub)
 		if err != nil {
@@ -181,11 +196,11 @@ func (t *SampleToken) Invoke(stub shim.ChaincodeStubInterface) peer.Response {
 		}
 		return shim.Success([]byte(s))
 	case "GetDecimals":
-		f, err := t.GetDecimals(stub)
+		s, err := t.GetDecimals(stub)
 		if err != nil {
 			return shim.Error(err.Error())
 		}
-		return shim.Success(FloatToBuffer(f))
+		return shim.Success([]byte(s))
 	case "Mint":
 		err := t.Mint(stub, params, t.GetOwner, t.GetBalanceOf, t.GetTotalSupply)
 		if err != nil {
@@ -240,6 +255,12 @@ func (t *SampleToken) Invoke(stub shim.ChaincodeStubInterface) peer.Response {
 			return shim.Error(err.Error())
 		}
 		return shim.Success([]byte(s))
+	case "Activate":
+		err := t.Activate(stub, params, t.GetBalanceOf)
+		if err != nil {
+			return shim.Error(err.Error())
+		}
+		return shim.Success(nil)
 	}
 
 	return shim.Error("Input function is not defined in chaincode")
@@ -255,18 +276,13 @@ type CustomBasicToken struct {
 	parentToken *erc20basic.Token
 }
 
-/*GetBalanceOf reimplement erc20basic's GetBalanceOf method*/
-func (t *CustomBasicToken) GetBalanceOf(stub shim.ChaincodeStubInterface, args []string) (float64, error) {
-	return t.parentToken.GetBalanceOf(stub, args)
-}
-
 /*GetTotalSupply reimplement erc20basic's GetTotalSupply method*/
-func (t *CustomBasicToken) GetTotalSupply(stub shim.ChaincodeStubInterface) (float64, error) {
+func (t *CustomBasicToken) GetTotalSupply(stub shim.ChaincodeStubInterface) (*big.Int, error) {
 	return t.parentToken.GetTotalSupply(stub)
 }
 
 /*GetAllowance reimplement erc20basic's GetAllowance method*/
-func (t *CustomBasicToken) GetAllowance(stub shim.ChaincodeStubInterface, args []string) (float64, error) {
+func (t *CustomBasicToken) GetAllowance(stub shim.ChaincodeStubInterface, args []string) (*big.Int, error) {
 	return t.parentToken.GetAllowance(stub, args)
 }
 
@@ -301,7 +317,7 @@ func (t *SampleToken) GetMemo(stub shim.ChaincodeStubInterface, args []string) (
 }
 
 /*Transfer adds "memo" feature after erc20basic's Transfer method*/
-func (t *CustomBasicToken) Transfer(stub shim.ChaincodeStubInterface, args []string, getBalanceOf func(shim.ChaincodeStubInterface, []string) (float64, error)) error {
+func (t *CustomBasicToken) Transfer(stub shim.ChaincodeStubInterface, args []string, getBalanceOf func(shim.ChaincodeStubInterface, []string) (*big.Int, error)) error {
 	err := t.parentToken.Transfer(stub, args, getBalanceOf)
 	if err != nil {
 		return err
@@ -317,8 +333,8 @@ func (t *CustomBasicToken) Transfer(stub shim.ChaincodeStubInterface, args []str
 /*TransferFrom adds "memo" feature after erc20basic's TransferFrom method*/
 func (t *CustomBasicToken) TransferFrom(stub shim.ChaincodeStubInterface,
 	args []string,
-	getBalanceOf func(shim.ChaincodeStubInterface, []string) (float64, error),
-	getAllowance func(shim.ChaincodeStubInterface, []string) (float64, error),
+	getBalanceOf func(shim.ChaincodeStubInterface, []string) (*big.Int, error),
+	getAllowance func(shim.ChaincodeStubInterface, []string) (*big.Int, error),
 ) error {
 	err := t.parentToken.TransferFrom(stub, args, getBalanceOf, getAllowance)
 	if err != nil {
@@ -340,6 +356,36 @@ func setMemo(stub shim.ChaincodeStubInterface, key string, memo string) error {
 	}
 	customLogger.Infof("setting %v to memo %v", memoKey, memo)
 	return stub.PutState(memoKey, []byte(memo))
+}
+
+/*GetBalanceOf is customed version of ERC20's standard, it rejects unregistered clients*/
+func (t *CustomBasicToken) GetBalanceOf(stub shim.ChaincodeStubInterface, args []string) (*big.Int, error) {
+	tokenBalance, err := stub.GetState(args[0])
+	logger.Infof("[sample-token.GetBalanceOf] balance of %v: %v", args[0], string(tokenBalance))
+	// if the returned buffer is empty, this account is not registered
+	if len(tokenBalance) == 0 {
+		logger.Noticef("[sample-token.GetBalanceOf] %v is not registered", args[0])
+		return nil, fmt.Errorf("%v is not registered", args[0])
+	}
+	return BufferToBigInt(DefaultToZeroIfEmpty(tokenBalance)), err
+}
+
+/*Activate is a customed non standard erc20 that set the balance of client to "0".
+This marks the active state of target so that subsequent Transfer operations will be successful
+
+* `args[0]` - the key ID of target client.*/
+func (t *SampleToken) Activate(stub shim.ChaincodeStubInterface, args []string, getBalanceOf func(shim.ChaincodeStubInterface, []string) (*big.Int, error)) error {
+	clientID := args[0]
+	balanceOfReceiver, err := getBalanceOf(stub, []string{clientID})
+	//if the client is never activated before
+	if err != nil && balanceOfReceiver == nil {
+		logger.Noticef("[sample-token.Activate] registering %v...", clientID)
+		// set the buffer to "0"
+		// so the next time (customed) `GetBalanceOf` is called it won't show error
+		return stub.PutState(clientID, []byte{48})
+	}
+	logger.Errorf("[sample-token.Activate] %v is already registered", clientID)
+	return fmt.Errorf("%v is already registered", clientID)
 }
 
 //#endregion custom non-standard ERC20 implementation (transaction memo)

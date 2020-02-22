@@ -2,6 +2,7 @@ package testutils
 
 import (
 	"encoding/base64"
+	"math/big"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/hyperledger/fabric/core/chaincode/shim"
@@ -94,15 +95,15 @@ func SetMockStubWithFakeCreator(stub *shim.MockStub) (*shim.MockStub, error) {
 }
 
 //WithBalanceOf mocks the "default" balance of all clients
-func WithBalanceOf(value float64) func(shim.ChaincodeStubInterface, []string) (float64, error) {
-	return func(shim.ChaincodeStubInterface, []string) (float64, error) {
+func WithBalanceOf(value *big.Int) func(shim.ChaincodeStubInterface, []string) (*big.Int, error) {
+	return func(shim.ChaincodeStubInterface, []string) (*big.Int, error) {
 		return value, nil
 	}
 }
 
 //WithAllowanceOf mocks the "default" allowances of all clients
-func WithAllowanceOf(value float64) func(shim.ChaincodeStubInterface, []string) (float64, error) {
-	return func(shim.ChaincodeStubInterface, []string) (float64, error) {
+func WithAllowanceOf(value *big.Int) func(shim.ChaincodeStubInterface, []string) (*big.Int, error) {
+	return func(shim.ChaincodeStubInterface, []string) (*big.Int, error) {
 		return value, nil
 	}
 }

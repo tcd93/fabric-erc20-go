@@ -1,5 +1,7 @@
 package erc20events
 
+import "math/big"
+
 /*enums for event names*/
 const (
 	TRANSFER = "transfer"
@@ -8,9 +10,9 @@ const (
 
 /*Payload of the event*/
 type Payload struct {
-	From   string  `json:"from"`
-	To     string  `json:"to"`
-	Amount float64 `json:"amount"`
+	From   string   `json:"from"`
+	To     string   `json:"to"`
+	Amount *big.Int `json:"amount"`
 }
 
 /*Event object to emit to clients, will be sent as JSON format*/

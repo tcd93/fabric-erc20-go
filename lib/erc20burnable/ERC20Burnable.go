@@ -4,6 +4,7 @@ import (
 	. "erc20/helpers"
 	"erc20/lib/erc20events"
 	"fmt"
+	"math/big"
 
 	"github.com/hyperledger/fabric/core/chaincode/shim"
 )
@@ -18,8 +19,8 @@ type Token struct{}
 * `args[0]` - the amount that will be burnt*/
 func (t *Token) Burn(stub shim.ChaincodeStubInterface,
 	args []string,
-	getTotalSupply func(stub shim.ChaincodeStubInterface) (float64, error),
-	getBalanceOf func(stub shim.ChaincodeStubInterface, args []string) (float64, error),
+	getTotalSupply func(stub shim.ChaincodeStubInterface) (*big.Int, error),
+	getBalanceOf func(stub shim.ChaincodeStubInterface, args []string) (*big.Int, error),
 ) error {
 	sValue := args[0]
 
@@ -32,7 +33,7 @@ func (t *Token) Burn(stub shim.ChaincodeStubInterface,
 		return err
 	}
 
-	burnAmount := StringToFloat(sValue)
+	burnAmount := StringToBigInt(sValue)
 
 	logger.Infof("Burn: burning %v tokens from %v", burnAmount, burneeID)
 
@@ -44,7 +45,7 @@ func (t *Token) Burn(stub shim.ChaincodeStubInterface,
 		return fmt.Errorf("burn amount should be less than balance of sender (%v): %v", burneeID, err)
 	}
 
-	err = stub.PutState(burneeID, FloatToBuffer(burnerBalance-burnAmount))
+	err = stub.PutState(burneeID, []byte(Sub(burnerBalance, burnAmount).String()))
 	if err != nil {
 		return err
 	}
@@ -57,7 +58,7 @@ func (t *Token) Burn(stub shim.ChaincodeStubInterface,
 		return fmt.Errorf("burn amount should be less than total supply (%v): %v", totalSupply, err)
 	}
 
-	err = stub.PutState("totalSupply", FloatToBuffer(totalSupply-burnAmount))
+	err = stub.PutState("totalSupply", []byte(Sub(totalSupply, burnAmount).String()))
 	if err != nil {
 		return err
 	}
@@ -74,9 +75,9 @@ the chaincode invoker must have sufficient allowance from burnee.
 * `args[1]` - the burn amount.*/
 func (t *Token) BurnFrom(stub shim.ChaincodeStubInterface,
 	args []string,
-	getAllowance func(stub shim.ChaincodeStubInterface, args []string) (float64, error),
-	getTotalSupply func(stub shim.ChaincodeStubInterface) (float64, error),
-	getBalanceOf func(stub shim.ChaincodeStubInterface, args []string) (float64, error),
+	getAllowance func(stub shim.ChaincodeStubInterface, args []string) (*big.Int, error),
+	getTotalSupply func(stub shim.ChaincodeStubInterface) (*big.Int, error),
+	getBalanceOf func(stub shim.ChaincodeStubInterface, args []string) (*big.Int, error),
 ) error {
 	burneeID, sValue := args[0], args[1]
 
@@ -89,7 +90,7 @@ func (t *Token) BurnFrom(stub shim.ChaincodeStubInterface,
 		return err
 	}
 
-	burnAmount := StringToFloat(sValue)
+	burnAmount := StringToBigInt(sValue)
 
 	logger.Infof("BurnFrom: burning %v tokens from %v with %v...", burnAmount, burneeID, burnerID)
 
@@ -111,7 +112,7 @@ func (t *Token) BurnFrom(stub shim.ChaincodeStubInterface,
 		return fmt.Errorf("burn amount should be less than balance of burnee (%v): %v", burneeID, err)
 	}
 
-	err = stub.PutState(burneeID, FloatToBuffer(balanceOfBurnee-burnAmount))
+	err = stub.PutState(burneeID, []byte(Sub(balanceOfBurnee, burnAmount).String()))
 	if err != nil {
 		return err
 	}
@@ -124,7 +125,7 @@ func (t *Token) BurnFrom(stub shim.ChaincodeStubInterface,
 		return fmt.Errorf("burn amount should be less than total supply (%v): %v", totalSupply, err)
 	}
 
-	err = stub.PutState("totalSupply", FloatToBuffer(totalSupply-burnAmount))
+	err = stub.PutState("totalSupply", []byte(Sub(totalSupply, burnAmount).String()))
 	if err != nil {
 		return err
 	}
