@@ -12,8 +12,28 @@ _Basic features:_
 * Pausable Token
 
 _Custom feature:_
-* Transaction memo (an extension from Basic Token feature)
-* Unregistered account check - accounts that are not registered via Fabric Node-sdk can not do transactions   
+* **Transaction memo** - able to attach an 'memo' to a transaction with a extra parameter to `Transfer` or `TransferFrom` methods
+* **Unregistered account check** - accounts that are not registered can not do transactions, register them first with `Activate` chaincode method
+---
+## Demo
+Set up the network via development tool ([Hurley](https://github.com/worldsibu/hurley)) or manual set up via the [official document](https://hyperledger-fabric.readthedocs.io/en/release-1.4/dev-setup/devenv.html)
+
+[Install & instantiate the chaincode](https://hyperledger-fabric.readthedocs.io/en/release-1.4/chaincode4noah.html#installing-chaincode) on the network
+
+![](/readme/env.png) *chaincodes are placed inside a separated Docker container*
+
+![](/readme/1.png) 
+![](/readme/2.png)
+![](/readme/3.png)*total supply of tokens are equal to the miner's (chaincode caller) account*
+
+![](/readme/4.png)*try to transfer some tokens to another account --> error due to the target user is not 'activated'*
+
+![](/readme/5.png)*'activate' said account*
+
+![](/readme/6.png)*`transfer` success!*
+
+![](/readme/7.png)
+
 ---
 
 ## Offline Unit Testing
