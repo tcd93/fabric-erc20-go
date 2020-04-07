@@ -26,7 +26,6 @@ go get github.com/onsi/gomega/...
 ```
 Execute `go test -v` to run the test suites without the need to start up the block chain
 
-_note: if there are problems with dependencies during development with govendor, try renaming the "vendor" folder to "\_vendor", and rename it back to "vendor" when deploying chaincode._   
 ---
 
 For details please read into `sample_token.go`
